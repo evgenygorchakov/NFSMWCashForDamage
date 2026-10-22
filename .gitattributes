@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# cmd and Notepad users expect CRLF
+*.bat text eol=crlf
+*.ini text eol=crlf
