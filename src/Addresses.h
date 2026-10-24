@@ -2,7 +2,7 @@
 
 // Addresses and offsets for speed.exe v1.3 (PE timestamp 0x438E4C8C, base 0x400000).
 // Every value comes from refs/nfsmw/config/SPEED_EXE_1_3/symbols.json and/or dumpbin
-// disassembly of this exe; the evidence is in docs/research.md.
+// disassembly of this exe.
 
 #include <cstdint>
 

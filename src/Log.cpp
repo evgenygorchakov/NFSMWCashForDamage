@@ -87,7 +87,7 @@ void Info(const char* format, ...) {
 void Fatal(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    Write("ОШИБКА: ", format, args);
+    Write("ERROR: ", format, args);
     va_end(args);
 }
 

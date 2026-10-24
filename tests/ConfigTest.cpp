@@ -38,7 +38,7 @@ void TaskExample() {
         "Enabled=1\n"
         "Multiplier=1.0\n"
         "PollIntervalMs=100\n"
-        "Source=CostToState   ; на будущее: возможность переключить на Bounty\n"
+        "Source=CostToState   ; later: an option to switch to Bounty\n"
         "Log=1\n");
     CHECK(c.warnings.empty());
     CHECK_EQ(c.settings.source, Source::CostToState);
@@ -68,8 +68,8 @@ void OutOfRangeIsClamped() {
     CHECK_EQ(c.settings.multiplier, 1000.0);
     CHECK_EQ(c.settings.pollIntervalMs, 10);
     CHECK_EQ(c.warnings.size(), size_t{2});
-    CHECK(HasWarning(c, "строка 1: Multiplier=5000 вне диапазона 0..1000, взято 1000"));
-    CHECK(HasWarning(c, "строка 2:"));
+    CHECK(HasWarning(c, "line 1: Multiplier=5000 is out of range 0..1000, using 1000"));
+    CHECK(HasWarning(c, "line 2:"));
 
     c = ParseConfig("Multiplier=-1\nPollIntervalMs=99999\n");
     CHECK_EQ(c.settings.multiplier, 0.0);
@@ -79,7 +79,7 @@ void OutOfRangeIsClamped() {
     c = ParseConfig("Multiplier=0\nMultiplier=1000\nPollIntervalMs=5000");
     CHECK_EQ(c.settings.multiplier, 1000.0);
     CHECK_EQ(c.settings.pollIntervalMs, 5000);
-    CHECK(HasWarning(c, "задан повторно"));
+    CHECK(HasWarning(c, "is set again"));
 }
 
 void InvalidValuesKeepDefaults() {
@@ -87,7 +87,7 @@ void InvalidValuesKeepDefaults() {
     for (const char* bad : badMultipliers) {
         const auto c = ParseConfig(std::string("Multiplier=") + bad);
         CHECK_EQ(c.settings.multiplier, 1.0);
-        CHECK(HasWarning(c, "не число"));
+        CHECK(HasWarning(c, "is not a number"));
     }
 
     auto c = ParseConfig("PollIntervalMs=1.5\nEnabled=maybe\nLog=2\n");
@@ -98,29 +98,29 @@ void InvalidValuesKeepDefaults() {
 
     c = ParseConfig("Source=Foo");
     CHECK_EQ(c.settings.source, Source::CostToState);
-    CHECK(HasWarning(c, "неизвестный источник"));
+    CHECK(HasWarning(c, "unknown source"));
 
     c = ParseConfig("Source=PlayerDamage\nSource=Foo");
     CHECK_EQ(c.settings.source, Source::PlayerDamage);
 }
 
 void BountyFallsBack() {
-    const auto c = ParseConfig("Source=Bounty ; позже");
+    const auto c = ParseConfig("Source=Bounty ; later");
     CHECK_EQ(c.settings.source, Source::CostToState);
-    CHECK(HasWarning(c, "пока не поддерживается"));
+    CHECK(HasWarning(c, "not supported yet"));
 }
 
 void UnknownAndBrokenLines() {
     const auto c = ParseConfig("Foo=1\njust text\n=5\n");
     CHECK_EQ(c.warnings.size(), size_t{3});
-    CHECK(HasWarning(c, "строка 1: неизвестный ключ Foo"));
-    CHECK(HasWarning(c, "строка 2: нет «=»"));
+    CHECK(HasWarning(c, "line 1: unknown key Foo"));
+    CHECK(HasWarning(c, "line 2: no '='"));
 }
 
 void MissingFile() {
     const auto c = cfd::LoadConfig(std::filesystem::path(CFD_SOURCE_DIR) / "no-such-file.ini");
     CHECK_EQ(c.warnings.size(), size_t{1});
-    CHECK(HasWarning(c, "не найден"));
+    CHECK(HasWarning(c, "not found"));
     CHECK_EQ(c.settings.multiplier, 1.0);
 }
 

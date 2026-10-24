@@ -76,7 +76,7 @@ public:
             flow_ = flow;
         }
         if (flow != addr::kFlowRacing) {
-            if (pursuit_.pointer != 0) EndPursuit("прервана: выход из заезда");
+            if (pursuit_.pointer != 0) EndPursuit("interrupted: left the race");
             // Unloading the world frees every pursuit; an address seen again is a new one.
             tracker_.ObjectGone();
             status_ = kUnknown;  // report the player again after loading
@@ -87,11 +87,11 @@ public:
         const int32_t contextKey = game::ReadRaceContext(context) ? context : kNoRaceStatus;
         if (contextKey != context_) {
             if (contextKey == addr::kContextCareer) {
-                Status("Контекст заезда: карьера");
+                Status("Race context: career");
             } else if (contextKey == kNoRaceStatus) {
-                Status("Нет GRaceStatus: жду");
+                Status("No GRaceStatus: waiting");
             } else {
-                Status("Контекст заезда %d: не карьера, деньги не начисляются", contextKey);
+                Status("Race context %d: not career, no cash is paid", contextKey);
             }
             context_ = contextKey;
         }
@@ -104,13 +104,13 @@ public:
         const game::PlayerStatus status = game::ReadPlayer(player);
         const bool changed = static_cast<int32_t>(status) != status_;
         if (changed) {
-            Status("Поиск игрока: %s", game::PlayerStatusName(status));
+            Status("Player lookup: %s", game::PlayerStatusName(status));
             status_ = static_cast<int32_t>(status);
         }
 
         std::string increase;
         if (status == game::PlayerStatus::Found) increase = Sample(player, changed);
-        if (payout_.Pending() > 0) Pay(increase.empty() ? "отложенное начисление" : increase);
+        if (payout_.Pending() > 0) Pay(increase.empty() ? "deferred payout" : increase);
     }
 
 private:
@@ -125,7 +125,7 @@ private:
     };
 
     static std::string FlowText(int32_t flow) {
-        if (flow == kUnknown) return "нет данных";
+        if (flow == kUnknown) return "unknown";
         return Format("%d %s", flow, game::FlowStateName(flow));
     }
 
@@ -133,7 +133,7 @@ private:
     void Status(const char* format, Args... args) {
         if (statusLines_ > kStatusLineLimit) return;
         if (statusLines_++ == kStatusLineLimit) {
-            logger::Info("Смен статуса больше %d, дальше они не пишутся", kStatusLineLimit);
+            logger::Info("More than %d status changes, no longer logging them", kStatusLineLimit);
             return;
         }
         logger::Info(format, args...);
@@ -153,7 +153,7 @@ private:
         TrackPursuit(player, damageOk, damage, totalOk, total);
         if (player.pursuit != 0 && !totalOk && !pursuit_.readFailureLogged) {
             pursuit_.readFailureLogged = true;
-            Status("Погоня 0x%08X: CostToState не прочитан, пропускаю опрос",
+            Status("Pursuit 0x%08X: could not read CostToState, skipping this poll",
                    static_cast<unsigned>(player.pursuit));
         }
 
@@ -170,11 +170,11 @@ private:
 
         const char* source = cfd::SourceName(settings_.source);
         if (r.event == cfd::Tracker::Event::Decrease) {
-            logger::Info("%s упал %lld -> %lld: новая база, ничего не начислено", source, r.before,
+            logger::Info("%s dropped %lld -> %lld: new baseline, nothing paid", source, r.before,
                          r.after);
         } else if (r.event == cfd::Tracker::Event::Implausible) {
-            logger::Info("%s %lld -> %lld: скачок больше %lld, похоже на ошибку чтения; новая база, "
-                         "ничего не начислено",
+            logger::Info("%s %lld -> %lld: jump larger than %lld, looks like a bad read; "
+                         "new baseline, nothing paid",
                          source, r.before, r.after, cfd::Tracker::kMaxDelta);
         }
         if (r.delta <= 0) return {};
@@ -182,12 +182,13 @@ private:
         const std::string change =
             Format("%s %lld -> %lld (×%g)", source, r.before, r.after, settings_.multiplier);
         if (settings_.multiplier <= 0.0) {
-            logger::Info("%s: множитель 0, ничего не начислено", change.c_str());
+            logger::Info("%s: multiplier is 0, nothing paid", change.c_str());
             return {};
         }
         payout_.Accrue(r.delta);
         if (payout_.Pending() == 0) {
-            logger::Info("%s: меньше $1, копится (остаток %.3f)", change.c_str(), payout_.Carry());
+            logger::Info("%s: less than $1, accumulating (carry %.3f)", change.c_str(),
+                         payout_.Carry());
             return {};
         }
         return change;
@@ -198,16 +199,16 @@ private:
         int32_t before = 0;
         int32_t after = 0;
         if (!game::AddCash(chunk, before, after)) {
-            Status("%s: не удалось записать деньги, $%lld отложено до следующего опроса",
+            Status("%s: could not write cash, $%lld deferred to the next poll",
                    what.c_str(), payout_.Pending());
             return;
         }
         const int64_t added = static_cast<int64_t>(after) - before;
         payout_.Paid(chunk);
         pursuit_.paid += added;
-        logger::Info("+$%lld: %s | деньги %d -> %d", added, what.c_str(), before, after);
+        logger::Info("+$%lld: %s | cash %d -> %d", added, what.c_str(), before, after);
         if (added < chunk) {
-            logger::Info("Деньги достигли максимума %d, ещё $%lld не начислено", INT_MAX,
+            logger::Info("Cash reached the maximum %d, $%lld more was not paid", INT_MAX,
                          chunk - added + payout_.Pending());
             payout_.Discard();
         }
@@ -216,12 +217,12 @@ private:
     void TrackPursuit(const game::Player& player, bool damageOk, int32_t damage, bool totalOk,
                       uint32_t total) {
         if (player.pursuit != pursuit_.pointer) {
-            if (pursuit_.pointer != 0) EndPursuit("закончилась");
+            if (pursuit_.pointer != 0) EndPursuit("ended");
             if (player.pursuit != 0) {
                 pursuit_.pointer = player.pursuit;
                 pursuit_.damageKnown = damageOk;
                 pursuit_.damageAtStart = damage;
-                logger::Info("Погоня началась (AIPursuit 0x%08X)",
+                logger::Info("Pursuit started (AIPursuit 0x%08X)",
                              static_cast<unsigned>(player.pursuit));
             }
         }
@@ -235,7 +236,7 @@ private:
     }
 
     void EndPursuit(const char* how) {
-        logger::Info("Погоня %s: итог %lld, урон от игрока %d, начислено $%lld", how,
+        logger::Info("Pursuit %s: total %lld, player damage %d, paid $%lld", how,
                      pursuit_.total, pursuit_.damage - pursuit_.damageAtStart, pursuit_.paid);
         pursuit_ = {};
     }
@@ -246,13 +247,13 @@ private:
         uintptr_t cashAddress = 0;
         int32_t cash = 0;
         const bool cashOk = game::ReadCashAddress(cashAddress) && game::ReadCash(cash);
-        Status("Игрок: IPlayer 0x%08X, ISimable 0x%08X, IVehicleAI 0x%08X, IPerpetrator 0x%08X, "
-               "погоня 0x%08X, урон от игрока %s; деньги %s (адрес 0x%08X)",
+        Status("Player: IPlayer 0x%08X, ISimable 0x%08X, IVehicleAI 0x%08X, IPerpetrator 0x%08X, "
+               "pursuit 0x%08X, player damage %s; cash %s (address 0x%08X)",
                static_cast<unsigned>(player.iplayer), static_cast<unsigned>(player.simable),
                static_cast<unsigned>(player.vehicleAI), static_cast<unsigned>(player.perpetrator),
                static_cast<unsigned>(player.pursuit),
-               damageOk ? std::to_string(damage).c_str() : "не читается",
-               cashOk ? Format("$%d", cash).c_str() : "не читаются",
+               damageOk ? std::to_string(damage).c_str() : "unreadable",
+               cashOk ? Format("$%d", cash).c_str() : "unreadable",
                static_cast<unsigned>(cashAddress));
     }
 
@@ -274,17 +275,17 @@ void Run() {
     const cfd::Settings& s = config.settings;
 
     logger::Init(dir / L"NFSMWCashForDamage.log", s.log);
-    logger::Info("NFSMWCashForDamage %s (сборка %s)", CFD_VERSION, __DATE__);
+    logger::Info("NFSMWCashForDamage %s (built %s)", CFD_VERSION, __DATE__);
     logger::Info("exe: %s", Utf8(ModulePath(nullptr)).c_str());
-    logger::Info("плагин: %s", Utf8(asi).c_str());
+    logger::Info("plugin: %s", Utf8(asi).c_str());
     for (const std::string& warning : config.warnings) {
         logger::Info("INI, %s", warning.c_str());
     }
-    logger::Info("Настройки: Enabled=%d Multiplier=%g PollIntervalMs=%d Source=%s Log=%d",
+    logger::Info("Settings: Enabled=%d Multiplier=%g PollIntervalMs=%d Source=%s Log=%d",
                  s.enabled ? 1 : 0, s.multiplier, s.pollIntervalMs, cfd::SourceName(s.source),
                  s.log ? 1 : 0);
     if (!s.enabled) {
-        logger::Info("Enabled=0: плагин выключен");
+        logger::Info("Enabled=0: plugin is off");
         return;
     }
 
@@ -296,16 +297,16 @@ void Run() {
         Sleep(100);
     }
     if (check == game::BuildCheck::NotV13) {
-        logger::Fatal("это не speed.exe v1.3, плагин ничего не делает: %s", failure.c_str());
+        logger::Fatal("this is not speed.exe v1.3, the plugin does nothing: %s", failure.c_str());
         return;
     }
     if (check == game::BuildCheck::CodeDiffers) {
-        logger::Fatal("код speed.exe v1.3 в памяти отличается от ожидаемого (возможно, его изменил "
-                      "другой плагин), плагин ничего не делает. Отличия: %s",
+        logger::Fatal("speed.exe v1.3 code in memory is not what was expected (another plugin "
+                      "may have patched it), the plugin does nothing. Differences: %s",
                       failure.c_str());
         return;
     }
-    logger::Info("speed.exe v1.3 подтверждён, начинаю опрос");
+    logger::Info("speed.exe v1.3 confirmed, polling started");
 
     Plugin plugin(s);
     for (;;) {
@@ -319,9 +320,9 @@ DWORD WINAPI ThreadMain(LPVOID) {
     try {
         Run();
     } catch (const std::exception& e) {
-        logger::Fatal("исключение: %s, плагин остановлен", e.what());
+        logger::Fatal("exception: %s, plugin stopped", e.what());
     } catch (...) {
-        logger::Fatal("неизвестное исключение, плагин остановлен");
+        logger::Fatal("unknown exception, plugin stopped");
     }
     return 0;
 }

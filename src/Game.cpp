@@ -106,7 +106,7 @@ BuildCheck VerifyBuild(std::string& failure) {
 
     const auto base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     if (base != addr::kImageBase) {
-        AddFailure(failure, "база exe 0x%08X, ожидалась 0x%08X", static_cast<unsigned>(base),
+        AddFailure(failure, "exe base 0x%08X, expected 0x%08X", static_cast<unsigned>(base),
                    static_cast<unsigned>(addr::kImageBase));
         return BuildCheck::NotV13;
     }
@@ -115,11 +115,11 @@ BuildCheck VerifyBuild(std::string& failure) {
     IMAGE_NT_HEADERS32 nt{};
     if (!mem::Read(base, &dos, sizeof(dos)) || dos.e_magic != IMAGE_DOS_SIGNATURE ||
         !mem::Read(base + dos.e_lfanew, &nt, sizeof(nt)) || nt.Signature != IMAGE_NT_SIGNATURE) {
-        AddFailure(failure, "не читается PE-заголовок exe");
+        AddFailure(failure, "cannot read the exe PE header");
         return BuildCheck::NotV13;
     }
     if (nt.FileHeader.TimeDateStamp != addr::kPeTimestamp) {
-        AddFailure(failure, "PE timestamp 0x%08X, ожидался 0x%08X (v1.3)",
+        AddFailure(failure, "PE timestamp 0x%08X, expected 0x%08X (v1.3)",
                    static_cast<unsigned>(nt.FileHeader.TimeDateStamp),
                    static_cast<unsigned>(addr::kPeTimestamp));
         return BuildCheck::NotV13;
@@ -128,10 +128,10 @@ BuildCheck VerifyBuild(std::string& failure) {
     for (const Signature& sig : kSignatures) {
         uint8_t actual[32] = {};
         if (sig.size > sizeof(actual) || !mem::Read(sig.address, actual, sig.size)) {
-            AddFailure(failure, "0x%08X (%s): не читается", static_cast<unsigned>(sig.address),
+            AddFailure(failure, "0x%08X (%s): unreadable", static_cast<unsigned>(sig.address),
                        sig.what);
         } else if (std::memcmp(actual, sig.bytes, sig.size) != 0) {
-            AddFailure(failure, "0x%08X (%s): ожидалось %s, в памяти %s",
+            AddFailure(failure, "0x%08X (%s): expected %s, in memory %s",
                        static_cast<unsigned>(sig.address), sig.what,
                        Hex(sig.bytes, sig.size).c_str(), Hex(actual, sig.size).c_str());
         }
@@ -141,11 +141,11 @@ BuildCheck VerifyBuild(std::string& failure) {
         uint32_t actual = 0;
         const uintptr_t at = slot.vtable + slot.offset;
         if (!mem::ReadU32(at, actual)) {
-            AddFailure(failure, "vtable 0x%08X+0x%02X (%s): не читается",
+            AddFailure(failure, "vtable 0x%08X+0x%02X (%s): unreadable",
                        static_cast<unsigned>(slot.vtable), static_cast<unsigned>(slot.offset),
                        slot.what);
         } else if (actual != slot.target) {
-            AddFailure(failure, "vtable 0x%08X+0x%02X (%s): ожидалось 0x%08X, в памяти 0x%08X",
+            AddFailure(failure, "vtable 0x%08X+0x%02X (%s): expected 0x%08X, in memory 0x%08X",
                        static_cast<unsigned>(slot.vtable), static_cast<unsigned>(slot.offset),
                        slot.what, static_cast<unsigned>(slot.target),
                        static_cast<unsigned>(actual));
@@ -165,10 +165,10 @@ const char* FlowStateName(int32_t state) {
         case 0: return "NONE";
         case 1: return "LOADING_FRONTEND";
         case 2: return "UNLOADING_FRONTEND";
-        case 3: return "IN_FRONTEND (меню)";
+        case 3: return "IN_FRONTEND (menu)";
         case 4: return "LOADING_REGION";
         case 5: return "LOADING_TRACK";
-        case 6: return "RACING (в игре)";
+        case 6: return "RACING (in game)";
         case 7: return "UNLOADING_TRACK";
         case 8: return "UNLOADING_REGION";
         case 9: return "EXIT_DEMO_DISC";
@@ -184,16 +184,16 @@ bool ReadRaceContext(int32_t& context) {
 
 const char* PlayerStatusName(PlayerStatus status) {
     switch (status) {
-        case PlayerStatus::Found: return "игрок найден";
-        case PlayerStatus::NoLocalPlayer: return "нет локального игрока";
-        case PlayerStatus::BadPlayer: return "IPlayer не LocalPlayer (vtable)";
-        case PlayerStatus::BadSimable: return "не читается ISimable игрока";
-        case PlayerStatus::BadInterfaceList: return "не читается список интерфейсов";
-        case PlayerStatus::NoVehicleAI: return "нет IVehicleAI";
-        case PlayerStatus::NoPerpetrator: return "нет IPerpetrator";
-        case PlayerStatus::UnexpectedVtable: return "IVehicleAI/IPerpetrator не AIVehicleHuman (vtable)";
+        case PlayerStatus::Found: return "player found";
+        case PlayerStatus::NoLocalPlayer: return "no local player";
+        case PlayerStatus::BadPlayer: return "IPlayer is not LocalPlayer (vtable)";
+        case PlayerStatus::BadSimable: return "cannot read the player's ISimable";
+        case PlayerStatus::BadInterfaceList: return "cannot read the interface list";
+        case PlayerStatus::NoVehicleAI: return "no IVehicleAI";
+        case PlayerStatus::NoPerpetrator: return "no IPerpetrator";
+        case PlayerStatus::UnexpectedVtable: return "IVehicleAI/IPerpetrator not AIVehicleHuman (vtable)";
         case PlayerStatus::BadLayout: return "IPerpetrator - IVehicleAI != 0x70C";
-        case PlayerStatus::BadPursuit: return "указатель погони не AIPursuit (vtable)";
+        case PlayerStatus::BadPursuit: return "pursuit pointer is not AIPursuit (vtable)";
     }
     return "?";
 }

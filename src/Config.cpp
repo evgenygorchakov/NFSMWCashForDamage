@@ -82,7 +82,7 @@ public:
 
         const size_t eq = text.find('=');
         if (eq == std::string_view::npos) {
-            Warn("нет «=», строка пропущена: " + std::string(text));
+            Warn("no '=', line skipped: " + std::string(text));
             return;
         }
         const std::string_view keyText = Trim(text.substr(0, eq));
@@ -93,7 +93,7 @@ public:
         if (key == "enabled" || key == "multiplier" || key == "pollintervalms" ||
             key == "source" || key == "log") {
             if (!seen_.insert(key).second) {
-                Warn("ключ " + std::string(keyText) + " задан повторно, предыдущее значение заменяется");
+                Warn("key " + std::string(keyText) + " is set again, replacing the previous value");
             }
         }
 
@@ -105,22 +105,22 @@ public:
         } else if (key == "multiplier") {
             const auto v = ParseDouble(value);
             if (!v) {
-                Warn(shown + " — не число, оставлено " + FormatDouble(s.multiplier));
+                Warn(shown + " is not a number, keeping " + FormatDouble(s.multiplier));
             } else if (*v < kMinMultiplier || *v > kMaxMultiplier) {
                 s.multiplier = std::clamp(*v, kMinMultiplier, kMaxMultiplier);
-                Warn(shown + " вне диапазона " + FormatDouble(kMinMultiplier) + ".." +
-                     FormatDouble(kMaxMultiplier) + ", взято " + FormatDouble(s.multiplier));
+                Warn(shown + " is out of range " + FormatDouble(kMinMultiplier) + ".." +
+                     FormatDouble(kMaxMultiplier) + ", using " + FormatDouble(s.multiplier));
             } else {
                 s.multiplier = *v;
             }
         } else if (key == "pollintervalms") {
             const auto v = ParseInt(value);
             if (!v) {
-                Warn(shown + " — не целое число, оставлено " + std::to_string(s.pollIntervalMs));
+                Warn(shown + " is not an integer, keeping " + std::to_string(s.pollIntervalMs));
             } else if (*v < kMinPollIntervalMs || *v > kMaxPollIntervalMs) {
                 s.pollIntervalMs = std::clamp(*v, kMinPollIntervalMs, kMaxPollIntervalMs);
-                Warn(shown + " вне диапазона " + std::to_string(kMinPollIntervalMs) + ".." +
-                     std::to_string(kMaxPollIntervalMs) + ", взято " +
+                Warn(shown + " is out of range " + std::to_string(kMinPollIntervalMs) + ".." +
+                     std::to_string(kMaxPollIntervalMs) + ", using " +
                      std::to_string(s.pollIntervalMs));
             } else {
                 s.pollIntervalMs = *v;
@@ -133,19 +133,19 @@ public:
                 s.source = Source::PlayerDamage;
             } else if (v == "bounty") {
                 s.source = Source::CostToState;
-                Warn(shown + " пока не поддерживается, работаю как CostToState");
+                Warn(shown + " is not supported yet, using CostToState");
             } else {
-                Warn(shown + " — неизвестный источник (CostToState или PlayerDamage), оставлено " +
+                Warn(shown + " is an unknown source (CostToState or PlayerDamage), keeping " +
                      SourceName(s.source));
             }
         } else {
-            Warn("неизвестный ключ " + std::string(keyText) + ", пропущен");
+            Warn("unknown key " + std::string(keyText) + ", skipped");
         }
     }
 
 private:
     void Warn(const std::string& message) {
-        out_.warnings.push_back("строка " + std::to_string(number_) + ": " + message);
+        out_.warnings.push_back("line " + std::to_string(number_) + ": " + message);
     }
 
     void Bool(const std::string& shown, std::string_view value, bool& target) {
@@ -153,7 +153,7 @@ private:
         if (v) {
             target = *v;
         } else {
-            Warn(shown + " — ожидалось 0 или 1, оставлено " + (target ? "1" : "0"));
+            Warn(shown + " should be 0 or 1, keeping " + (target ? "1" : "0"));
         }
     }
 
@@ -187,8 +187,8 @@ ParsedConfig LoadConfig(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
         ParsedConfig out;
-        out.warnings.push_back("файл настроек не найден: " + ToUtf8(path) +
-                               ", используются значения по умолчанию");
+        out.warnings.push_back("settings file not found: " + ToUtf8(path) +
+                               ", using defaults");
         return out;
     }
     std::ostringstream content;
